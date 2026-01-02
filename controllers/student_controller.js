@@ -217,8 +217,8 @@ exports.uploadProfilePicture = asyncHandler(async (req, res, next) => {
 });
 
 // Get token from model , create cookie and send response
-const sendTokenResponse = (Student, statusCode, res) => {
-  const token = Student.getSignedJwtToken();
+const sendTokenResponse = (student, statusCode, res) => {
+  const token = student.getSignedJwtToken();
 
   const options = {
     //Cookie will expire in 30 days
@@ -234,11 +234,16 @@ const sendTokenResponse = (Student, statusCode, res) => {
   }
   //we have created a cookie with a token
 
+  // Remove password from user object
+  const userResponse = student.toObject();
+  delete userResponse.password;
+
   res
     .status(statusCode)
     .cookie("token", token, options) // key , value ,options
     .json({
       success: true,
       token,
+      data: userResponse,
     });
 };
