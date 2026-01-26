@@ -1,51 +1,36 @@
 const asyncHandler = require("../middleware/async");
 const Student = require("../models/student_model");
-const Batch = require("../models/batch_model");
 const path = require("path");
 const fs = require("fs");
 
 // @desc    Create a new student
 // @route   POST /api/students
 // @access  Public
-
 exports.createStudent = asyncHandler(async (req, res) => {
-  const { name, email, username, password, batchId, phoneNumber, profilePicture } = req.body;
+  const { fullName, email, username, password, profilePicture } = req.body;
 
-  console.log("Creating student with name:", name);
+  console.log("Creating student with fullName:", fullName);
 
-  // Check if the batch exists
-  const existingBatch = await Batch.findById(batchId);
-  if (!existingBatch) {
-    return res.status(404).json({ message: "Batch not found" });
+  if (!fullName || !email || !username || !password) {
+    return res.status(400).json({ message: "Please provide all fields" });
   }
 
-  // Check if the email already exists
-  const existingEmail = await Student.findOne({ email });
-  if (existingEmail) {
-    return res.status(400).json({ message: "Email already exists" });
+  // Check if email or username exists
+  const existing = await Student.findOne({ $or: [{ email }, { username }] });
+  if (existing) {
+    return res
+      .status(400)
+      .json({ message: "Email or Username already exists" });
   }
 
-  // Check if the username already exists
-  const existingUsername = await Student.findOne({ username }).collation({
-    locale: "en",
-    strength: 2,
-  }); // Case-insensitive check
-  if (existingUsername) {
-    return res.status(400).json({ message: "Username already exists" });
-  }
-
-  // Create the student
   const student = await Student.create({
-    name,
+    fullName,
     email,
     username,
-    password, // Password will be hashed automatically by the pre-save hook
-    batchId,
-    phoneNumber,
+    password,
     profilePicture: profilePicture || "default-profile.png",
   });
 
-  // Remove password from response
   const studentResponse = student.toObject();
   delete studentResponse.password;
 
@@ -58,17 +43,13 @@ exports.createStudent = asyncHandler(async (req, res) => {
 // @desc    Login student
 // @route   POST /api/students/login
 // @access  Public
-
-exports.loginStudent = asyncHandler(async (req, res, next) => {
+exports.loginStudent = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res
-      .status(400)
-      .json({ message: "Please provide an email and password" });
+    return res.status(400).json({ message: "Please provide email and password" });
   }
 
-  // Check if student exists
   const student = await Student.findOne({ email }).select("+password");
 
   if (!student || !(await student.matchPassword(password))) {
@@ -80,10 +61,9 @@ exports.loginStudent = asyncHandler(async (req, res, next) => {
 
 // @desc    Get all students
 // @route   GET /api/students
-// @access  Public
-
+// @access  Private
 exports.getAllStudents = asyncHandler(async (req, res) => {
-  const students = await Student.find().populate("batchId", "batchName");
+  const students = await Student.find();
 
   res.status(200).json({
     success: true,
@@ -95,155 +75,93 @@ exports.getAllStudents = asyncHandler(async (req, res) => {
 // @desc    Get a student by ID
 // @route   GET /api/students/:id
 // @access  Public
-
 exports.getStudentById = asyncHandler(async (req, res) => {
-  const student = await Student.findById(req.params.id).populate(
-    "batchId",
-    "batchName"
-  );
-
-  if (!student) {
-    return res.status(404).json({ message: "Student not found" });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: student,
-  });
-});
-
-// @desc    Update a student
-// @route   PUT /api/students/:id
-// @access  Private
-
-exports.updateStudent = asyncHandler(async (req, res) => {
-  const { name, email, username, password, batchId, phoneNumber, profilePicture } = req.body;
-
   const student = await Student.findById(req.params.id);
 
   if (!student) {
     return res.status(404).json({ message: "Student not found" });
   }
 
-  // Authorization check: Make sure user is updating their own profile
+  res.status(200).json({ success: true, data: student });
+});
+
+// @desc    Update student
+// @route   PUT /api/students/:id
+// @access  Private
+exports.updateStudent = asyncHandler(async (req, res) => {
+  const { fullName, email, username, password, profilePicture } = req.body;
+
+  const student = await Student.findById(req.params.id);
+  if (!student) return res.status(404).json({ message: "Student not found" });
+
   if (student._id.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      message: "Not authorized to update this student profile"
-    });
+    return res.status(403).json({ message: "Not authorized to update this student" });
   }
 
-  // Update the student fields
-  student.name = name || student.name;
+  student.fullName = fullName || student.fullName;
   student.email = email || student.email;
   student.username = username || student.username;
-  student.phoneNumber = phoneNumber || student.phoneNumber;
-  student.batchId = batchId || student.batchId;
   student.profilePicture = profilePicture || student.profilePicture;
-
-  // Only update password if provided (will be hashed by pre-save hook)
-  if (password) {
-    student.password = password;
-  }
+  if (password) student.password = password;
 
   await student.save();
 
-  res.status(200).json({
-    success: true,
-    data: student,
-  });
+  const studentResponse = student.toObject();
+  delete studentResponse.password;
+
+  res.status(200).json({ success: true, data: studentResponse });
 });
 
-// @desc    Delete a student
+// @desc    Delete student
 // @route   DELETE /api/students/:id
 // @access  Private
-
 exports.deleteStudent = asyncHandler(async (req, res) => {
   const student = await Student.findById(req.params.id);
+  if (!student) return res.status(404).json({ message: "Student not found" });
 
-  if (!student) {
-    return res.status(404).json({ message: "Student not found" });
-  }
-
-  // Authorization check: Make sure user is deleting their own profile
   if (student._id.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      message: "Not authorized to delete this student profile"
-    });
+    return res.status(403).json({ message: "Not authorized to delete this student" });
   }
 
-  // Remove the student's profile picture if it exists
-  if (
-    student.profilePicture &&
-    student.profilePicture !== "default-profile.png"
-  ) {
-    const profilePicturePath = path.join(
-      __dirname,
-      "../public/profile_pictures",
-      student.profilePicture
-    );
-    if (fs.existsSync(profilePicturePath)) {
-      fs.unlinkSync(profilePicturePath);
-    }
+  // Delete profile picture if not default
+  if (student.profilePicture && student.profilePicture !== "default-profile.png") {
+    const profilePath = path.join(__dirname, "../public/profile_pictures", student.profilePicture);
+    if (fs.existsSync(profilePath)) fs.unlinkSync(profilePath);
   }
 
-  await Student.findByIdAndDelete(req.params.id);
+  await Student.findByIdAndDelete(student._id);
 
-  res.status(200).json({
-    success: true,
-    message: "Student deleted successfully",
-  });
+  res.status(200).json({ success: true, message: "Student deleted successfully" });
 });
 
-// @desc Upload Single Image
-// @route POST /api/v1/auth/upload
-// @access Private
+// Upload profile picture
+exports.uploadProfilePicture = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: "Please upload a file" });
 
-exports.uploadProfilePicture = asyncHandler(async (req, res, next) => {
-  if (!req.file) {
-    return res.status(400).send({ message: "Please upload a file" });
-  }
-
-  // Check for the file size and send an error message
   if (req.file.size > process.env.MAX_FILE_UPLOAD) {
-    return res.status(400).send({
-      message: `Please upload an image less than ${process.env.MAX_FILE_UPLOAD} bytes`,
+    return res.status(400).json({
+      message: `File too large. Max ${process.env.MAX_FILE_UPLOAD} bytes`,
     });
   }
 
-  res.status(200).json({
-    success: true,
-    data: req.file.filename,
-  });
+  res.status(200).json({ success: true, data: req.file.filename });
 });
 
-// Get token from model , create cookie and send response
+// Send token
 const sendTokenResponse = (student, statusCode, res) => {
   const token = student.getSignedJwtToken();
-
   const options = {
-    //Cookie will expire in 30 days
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
-    ),
+    expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRE * 24*60*60*1000),
     httpOnly: true,
   };
+  if (process.env.NODE_ENV === "production") options.secure = true;
 
-  // Cookie security is false .if you want https then use this code. do not use in development time
-  if (process.env.NODE_ENV === "production") {
-    options.secure = true;
-  }
-  //we have created a cookie with a token
+  const studentObj = student.toObject();
+  delete studentObj.password;
 
-  // Remove password from user object
-  const userResponse = student.toObject();
-  delete userResponse.password;
-
-  res
-    .status(statusCode)
-    .cookie("token", token, options) // key , value ,options
-    .json({
-      success: true,
-      token,
-      data: userResponse,
-    });
+  res.status(statusCode).cookie("token", token, options).json({
+    success: true,
+    token,
+    data: studentObj,
+  });
 };

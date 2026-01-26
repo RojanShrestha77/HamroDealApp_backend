@@ -106,23 +106,26 @@ app.use(cors(corsOptions)); // Enable CORS with options
 app.use(limiter); // Apply rate limiting to all requests
 app.use(express.static(path.join(__dirname, "public"))); // Serve static files
 
-// Routes
-const batchRoutes = require("./routes/batch_route");
-app.use("/api/v1/batches", batchRoutes);
+// ================= ROUTES =================
 
-const categoryRoutes = require("./routes/category_route");
-app.use("/api/v1/categories", categoryRoutes);
-
-// Apply stricter rate limiting to login endpoint
+// Only enable student routes (login & registration)
 const studentRoutes = require("./routes/student_route");
-app.use("/api/v1/students/login", authLimiter);
+app.use("/api/v1/students/login", authLimiter); // login rate limiter
 app.use("/api/v1/students", studentRoutes);
+
+// ================= COMMENTED OUT UNUSED ROUTES =================
+
+// const batchRoutes = require("./routes/batch_route");
+// app.use("/api/v1/batches", batchRoutes);
+
+// const categoryRoutes = require("./routes/category_route");
+// app.use("/api/v1/categories", categoryRoutes);
 
 const itemRoutes = require("./routes/item_route");
 app.use("/api/v1/items", itemRoutes);
 
-const commentRoutes = require("./routes/comment_route");
-app.use("/api/v1/comments", commentRoutes);
+// const commentRoutes = require("./routes/comment_route");
+// app.use("/api/v1/comments", commentRoutes);
 
 // const userRoutes = require("./routes/userRoutes");
 // const productRoutes = require("./routes/productRoutes");
@@ -133,6 +136,8 @@ app.use("/api/v1/comments", commentRoutes);
 // app.use("/api/v1/orders", orderRoutes);
 // app.use("/api/v1/payments", paymentRoutes);
 
+// ============================================
+
 // Error handling middleware
 app.use(errorHandler);
 
@@ -140,7 +145,6 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(
-    `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.green.bold
-      .underline
+    `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.green.bold.underline
   );
 });

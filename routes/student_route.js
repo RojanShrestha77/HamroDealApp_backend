@@ -14,12 +14,11 @@ const {
 } = require("../controllers/student_controller");
 
 router.post("/upload", upload.single("profilePicture"), uploadProfilePicture);
-
 router.post("/", createStudent);
-router.get("/", protect, getAllStudents); // Protected - prevents user enumeration
 router.post("/login", loginStudent);
+router.get("/", protect, getAllStudents);
+router.get("/:id", getStudentById);
 router.put("/:id", protect, updateStudent);
 router.delete("/:id", protect, deleteStudent);
-router.get("/:id", getStudentById);
 
 module.exports = router;

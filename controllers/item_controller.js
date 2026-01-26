@@ -1,24 +1,22 @@
 const asyncHandler = require("../middleware/async");
 const Item = require("../models/items_model");
 const path = require("path");
-const fs = require("fs");
+const fs = require("fs").promises;
 
 // @desc    Create a new item
 // @route   POST /api/v1/items
-// @access  Public
+// @access  Private
 exports.createItem = asyncHandler(async (req, res) => {
-  const { itemName, description, type, category, location, media, reportedBy } =
-    req.body;
+  const { productName, description, price, quantity, category, media, mediaType } = req.body;
 
-  // Create the item
   const item = await Item.create({
-    itemName,
+    productName,
     description,
-    type,
+    price,
+    quantity,
     category,
-    location,
     media,
-    reportedBy,
+    mediaType,
   });
 
   res.status(201).json({
@@ -35,20 +33,16 @@ exports.getAllItems = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 10;
   const skip = (page - 1) * limit;
 
-  // Build filter object
   const filter = {};
-  if (req.query.type) filter.type = req.query.type;
   if (req.query.status) filter.status = req.query.status;
   if (req.query.category) filter.category = req.query.category;
 
   const total = await Item.countDocuments(filter);
   const items = await Item.find(filter)
-    .populate("reportedBy", "name username")
-    .populate("claimedBy", "name username")
-    .populate("category", "name")
-    .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .populate("category", "name")
+    .sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,
@@ -65,12 +59,13 @@ exports.getAllItems = asyncHandler(async (req, res) => {
 // @access  Public
 exports.getItemById = asyncHandler(async (req, res) => {
   const item = await Item.findById(req.params.id)
-    .populate("reportedBy", "name username")
-    .populate("claimedBy", "name username")
     .populate("category", "name");
 
   if (!item) {
-    return res.status(404).json({ message: "Item not found" });
+    return res.status(404).json({ 
+      success: false,
+      message: "Item not found" 
+    });
   }
 
   res.status(200).json({
@@ -84,39 +79,32 @@ exports.getItemById = asyncHandler(async (req, res) => {
 // @access  Private
 exports.updateItem = asyncHandler(async (req, res) => {
   const {
-    itemName,
+    productName,
     description,
-    type,
+    price,
+    quantity,
     category,
-    location,
     media,
-    claimedBy,
-    isClaimed,
+    mediaType,
     status,
   } = req.body;
 
   const item = await Item.findById(req.params.id);
 
   if (!item) {
-    return res.status(404).json({ message: "Item not found" });
-  }
-
-  // Authorization check: Make sure user owns this item
-  if (item.reportedBy.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      message: "Not authorized to update this item",
+    return res.status(404).json({ 
+      success: false,
+      message: "Item not found" 
     });
   }
 
-  // Update the item fields
-  item.itemName = itemName || item.itemName;
+  item.productName = productName || item.productName;
   item.description = description || item.description;
-  item.type = type || item.type;
+  item.price = price !== undefined ? price : item.price;
+  item.quantity = quantity !== undefined ? quantity : item.quantity;
   item.category = category || item.category;
-  item.location = location || item.location;
   item.media = media || item.media;
-  item.claimedBy = claimedBy || item.claimedBy;
-  item.isClaimed = isClaimed !== undefined ? isClaimed : item.isClaimed;
+  item.mediaType = mediaType || item.mediaType;
   item.status = status || item.status;
 
   await item.save();
@@ -134,19 +122,13 @@ exports.deleteItem = asyncHandler(async (req, res) => {
   const item = await Item.findById(req.params.id);
 
   if (!item) {
-    return res.status(404).json({ message: "Item not found" });
-  }
-
-  // Authorization check: Make sure user owns this item
-  if (item.reportedBy.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      message: "Not authorized to delete this item",
+    return res.status(404).json({ 
+      success: false,
+      message: "Item not found" 
     });
   }
 
-  // Remove the item's media file if it exists
   if (item.media && item.media !== "default.jpg") {
-    // Check if it's a photo or video based on file extension
     const ext = path.extname(item.media).toLowerCase();
     let mediaPath;
 
@@ -156,8 +138,12 @@ exports.deleteItem = asyncHandler(async (req, res) => {
       mediaPath = path.join(__dirname, "../public/item_videos", item.media);
     }
 
-    if (mediaPath && fs.existsSync(mediaPath)) {
-      fs.unlinkSync(mediaPath);
+    if (mediaPath) {
+      try {
+        await fs.unlink(mediaPath);
+      } catch (err) {
+        console.log(`Could not delete file: ${err.message}`);
+      }
     }
   }
 
@@ -171,15 +157,18 @@ exports.deleteItem = asyncHandler(async (req, res) => {
 
 // @desc    Upload Item Photo
 // @route   POST /api/v1/items/upload-photo
-// @access  Public
+// @access  Private
 exports.uploadItemPhoto = asyncHandler(async (req, res, next) => {
   if (!req.file) {
-    return res.status(400).send({ message: "Please upload a photo file" });
+    return res.status(400).json({ 
+      success: false,
+      message: "Please upload a photo file" 
+    });
   }
 
-  // Check for the file size
   if (req.file.size > process.env.MAX_FILE_UPLOAD) {
-    return res.status(400).send({
+    return res.status(400).json({
+      success: false,
       message: `Please upload an image less than ${process.env.MAX_FILE_UPLOAD} bytes`,
     });
   }
@@ -193,15 +182,18 @@ exports.uploadItemPhoto = asyncHandler(async (req, res, next) => {
 
 // @desc    Upload Item Video
 // @route   POST /api/v1/items/upload-video
-// @access  Public
+// @access  Private
 exports.uploadItemVideo = asyncHandler(async (req, res, next) => {
   if (!req.file) {
-    return res.status(400).send({ message: "Please upload a video file" });
+    return res.status(400).json({ 
+      success: false,
+      message: "Please upload a video file" 
+    });
   }
 
-  // Check for the file size
   if (req.file.size > process.env.MAX_FILE_UPLOAD) {
-    return res.status(400).send({
+    return res.status(400).json({
+      success: false,
       message: `Please upload a video less than ${process.env.MAX_FILE_UPLOAD} bytes`,
     });
   }

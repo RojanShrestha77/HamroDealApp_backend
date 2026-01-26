@@ -2,9 +2,9 @@ const mongoose = require("mongoose");
 
 const itemSchema = new mongoose.Schema(
   {
-    itemName: {
+    productName: {
       type: String,
-      required: [true, "Item name is required"],
+      required: [true, "Product name is required"],
       trim: true,
     },
     description: {
@@ -12,21 +12,26 @@ const itemSchema = new mongoose.Schema(
       required: [true, "Description is required"],
       trim: true,
     },
-    type: {
-      type: String,
-      required: [true, "Item type is required"],
-      enum: ["lost", "found"],
+    price: {
+      type: Number,
+      required: [true, 'Price is required'],
+      min: [0, 'Price must be >= 0'],
+    },
+    quantity: {
+      type: Number,
+      required: [true, 'Quantity is required'],
+      min: [1, 'Quantity must be >= 1'],
+      validate: {
+        validator: function(v) {
+          return Number.isInteger(v);
+        },
+        message: 'Quantity must be an integer',
+      }
     },
     category: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "Category",
       required: [true, "Category is required"],
-    },
-    location: {
-      type: String,
-      required: [true, "Location is required"],
-      trim: true,
-      maxlength: [200, "Location cannot exceed 200 characters"],
     },
     media: {
       type: String,
@@ -38,20 +43,7 @@ const itemSchema = new mongoose.Schema(
       enum: ["photo", "video"],
       default: "photo",
     },
-    claimedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
-      default: null,
-    },
-    isClaimed: {
-      type: Boolean,
-      default: false,
-    },
-    reportedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
-      required: [true, "Reported by is required"],
-    },
+   
     status: {
       type: String,
       required: [true, "Status is required"],
@@ -63,4 +55,5 @@ const itemSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
 module.exports = mongoose.model("Item", itemSchema);
