@@ -118,8 +118,8 @@ app.use("/api/v1/students", studentRoutes);
 // const batchRoutes = require("./routes/batch_route");
 // app.use("/api/v1/batches", batchRoutes);
 
-// const categoryRoutes = require("./routes/category_route");
-// app.use("/api/v1/categories", categoryRoutes);
+const categoryRoutes = require("./routes/category_route");
+app.use("/api/v1/categories", categoryRoutes);
 
 const itemRoutes = require("./routes/item_route");
 app.use("/api/v1/items", itemRoutes);

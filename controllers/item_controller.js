@@ -39,10 +39,11 @@ exports.getAllItems = asyncHandler(async (req, res) => {
 
   const total = await Item.countDocuments(filter);
   const items = await Item.find(filter)
-    .skip(skip)
-    .limit(limit)
-    .populate("category", "name")
-    .sort({ createdAt: -1 });
+  .populate("category")
+  .sort({ createdAt: -1 })
+  .skip(skip)
+  .limit(limit);
+
 
   res.status(200).json({
     success: true,

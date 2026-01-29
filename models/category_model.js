@@ -3,10 +3,10 @@ const mongoose = require("mongoose");
 const categorySchema = new mongoose.Schema(
   {
     // Use _id as String to accept UUID from Flutter/Hive
-    _id: {
-      type: String,
-      required: true,
-    },
+    // _id: {
+    //   type: String,
+    //   required: true,
+    // },
     name: {
       type: String,
       required: [true, "Category name is required"],
