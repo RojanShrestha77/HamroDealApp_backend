@@ -33,7 +33,7 @@ const studentSchema = new mongoose.Schema({
   },
   profilePicture: {
     type: String,
-    default: "default-profile.png",
+    default: "profile_pictures/default-profile.png",
     trim: true,
   },
   createdAt: {

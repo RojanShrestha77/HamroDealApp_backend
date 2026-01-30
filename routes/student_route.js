@@ -21,4 +21,6 @@ router.get("/:id", getStudentById);
 router.put("/:id", protect, updateStudent);
 router.delete("/:id", protect, deleteStudent);
 
+router.post("/upload-profile-picture", protect, upload.single("profilePicture"), uploadProfilePicture);
+
 module.exports = router;

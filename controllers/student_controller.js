@@ -136,15 +136,50 @@ exports.deleteStudent = asyncHandler(async (req, res) => {
 
 // Upload profile picture
 exports.uploadProfilePicture = asyncHandler(async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "Please upload a file" });
+  if (!req.file) {
+
+    return res.status(400).json({ message: "Please upload a file" });
+  } 
+
+  
+  
+  const studentId = req.user._id;
+  
+  const student = await Student.findById(studentId);
+  if(!student) {
+    fs.unlinkSync(req.gfile.path);
+    return res.staus(404).json({
+      success: false,
+      message: 'Student not fouund',
+    });
+  }
+
+  // Delete old profile picture if exists (not default)
+  if (
+    student.profilePicture &&
+    student.profilePicture !== "profile_pictures/default-profile.png"
+  ) {
+    const oldImagePath = path.join(__dirname, "../public", student.profilePicture);
+    if (fs.existsSync(oldImagePath)) {
+      fs.unlinkSync(oldImagePath);
+    }
+  }  
+
+  // update student with new propfile pcitrure path
+  student.profilePicture = `profile_pictures/${req.file.filename}`;
+  await student.save();
+
+
+
 
   if (req.file.size > process.env.MAX_FILE_UPLOAD) {
     return res.status(400).json({
       message: `File too large. Max ${process.env.MAX_FILE_UPLOAD} bytes`,
     });
   }
+  
 
-  res.status(200).json({ success: true, data: req.file.filename });
+  res.status(200).json({ success: true,message: "Profile picture uploaded successfully", data: req.file.filename });
 });
 
 // Send token
